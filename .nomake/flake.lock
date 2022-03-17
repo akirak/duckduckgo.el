@@ -1,0 +1,27 @@
+{
+  "nodes": {
+    "duckduckgo": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1647537678,
+        "narHash": "sha256-krvrVuCyaSglHBn16rD6oB6OIgZyDI+l+K2uGDOUhmo=",
+        "owner": "akirak",
+        "repo": "duckduckgo.el",
+        "rev": "bc97c2fc30b8f6eb954b25c7d697ebea775a5582",
+        "type": "github"
+      },
+      "original": {
+        "owner": "akirak",
+        "repo": "duckduckgo.el",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "duckduckgo": "duckduckgo"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
