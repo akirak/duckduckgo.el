@@ -33,8 +33,14 @@
 
 ;;; Code:
 
+(require 'cl-lib)
+
+(declare-function utf7-decode "utf7")
+(declare-function xml-parse-tag "xml")
+
 (defgroup duckduckgo nil
   ""
+  :group 'convenience
   :prefix "duckduckgo-")
 
 (defconst duckduckgo-url "https://duckduckgo.com")
@@ -134,6 +140,7 @@
       (duckduckgo-bang--persist))))
 
 (defun duckduckgo-bang--parse-category-list ()
+  (require 'xml)
   (search-forward "<h6>Here's the full list of !bang commands by category:</h6>")
   (let (ctx result)
     (while (re-search-forward (rx (or "<h4 " "<h6>"))
