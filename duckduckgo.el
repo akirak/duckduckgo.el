@@ -182,7 +182,7 @@
   (with-temp-buffer
     (let ((print-level nil)
           (print-length nil))
-      (princ duckduckgo-bang-alist (current-buffer)))
+      (prin1 duckduckgo-bang-alist (current-buffer)))
     (unless (file-directory-p (file-name-directory duckduckgo-bang-file))
       (make-directory (file-name-directory duckduckgo-bang-file)))
     (write-file duckduckgo-bang-file)))
