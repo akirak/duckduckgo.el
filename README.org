@@ -1,0 +1,3 @@
+* duckduckgo.el
+This package provides =duckduckgo= command for Emacs, which performs search using DuckDuckGo.
+The command supports completion of [[https://duckduckgo.com/bang][bangs]], so you can type part of a website name, press TAB, and enter the rest of your query to perform search on a particular service.
