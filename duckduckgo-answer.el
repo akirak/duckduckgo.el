@@ -1,5 +1,7 @@
 ;;; duckduckgo-answer.el --- Instant Answer -*- lexical-binding: t -*-
 
+(require 'eieio)
+
 (defgroup duckduckgo-answer nil
   ""
   :prefix "duckduckgo-answer-"
@@ -16,7 +18,7 @@
   "Directory in which Instant Answer responses are cached."
   :type 'directory)
 
-(defclass duckduckgo-answer ()
+(defclass duckduckgo-answer-class ()
   ((Abstract :initarg :Abstract)
    (AbstractSource :initarg :AbstractSource)
    (AbstractText :initarg :AbstractText)
@@ -43,7 +45,7 @@
   'help-function 'browse-url
   'help-echo (purecopy "mouse-2, RET: Browse the URL"))
 
-(define-button-type 'duckduckgo-answer
+(define-button-type 'duckduckgo-answer-button
   :supertype 'help-xref
   'help-function 'duckduckgo-answer
   'help-echo (purecopy "mouse-2, RET: Browse the answer"))
@@ -57,7 +59,7 @@
      (if response
          (with-electric-help
           `(lambda ()
-             (let ((answer (apply #'make-instance 'duckduckgo-answer ',response)))
+             (let ((answer (apply #'make-instance 'duckduckgo-answer-class ',response)))
                (when-let (heading (oref answer Heading))
                  (insert heading "\n")
                  (insert ?\n))
@@ -102,7 +104,7 @@
                                           duckduckgo-answer-url-prefixes))
                           (title (duckduckgo-answer--url-decode query)))
                      (insert-text-button title
-                                         'type 'duckduckgo-answer
+                                         'type 'duckduckgo-answer-button
                                          'help-args (list query))
                      (insert (string-remove-prefix title text)))
                    (insert "\n"))
