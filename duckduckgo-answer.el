@@ -229,7 +229,10 @@
       ((make-candidate
          (group alist)
          (if-let (url (plist-get alist :FirstURL))
-             (propertize (string-remove-prefix "https://duckduckgo.com/" url)
+             (propertize (replace-regexp-in-string
+                          (rx bol "https://duckduckgo.com/"
+                              (?  (any "a-z") "/"))
+                          "" url)
                          'invisible t
                          'help-echo (plist-get alist :Text)
                          'duckduckgo-topic-group group)
