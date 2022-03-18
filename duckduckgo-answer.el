@@ -267,7 +267,8 @@
       (with-temp-buffer
         (insert-file-contents file)
         (goto-char (point-min))
-        (duckduckgo-answer--parse)))))
+        (duckduckgo-answer--normalize-plist
+         (duckduckgo-answer--parse))))))
 
 (defun duckduckgo-answer--save-cache (plist)
   (when plist
