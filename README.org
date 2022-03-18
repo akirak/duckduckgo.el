@@ -1,3 +1,7 @@
 * duckduckgo.el
-This package provides =duckduckgo= command for Emacs, which performs search using DuckDuckGo.
+This package lets you use features of the DuckDuckGo search engine from inside Emacs.
+** Usage
+=duckduckgo= command (in =duckduckgo.el=) performs search using DuckDuckGo.
 The command supports completion of [[https://duckduckgo.com/bang][bangs]], so you can type part of a website name, press TAB, and enter the rest of your query to perform search on a particular service.
+
+=duckduckgo-answer= command (in =duckduckgo-answer.el=) retrieves information on a topic using [[https://duckduckgo.com/api][Instant Answer API]] and displays the result in a buffer.
