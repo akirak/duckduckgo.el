@@ -109,7 +109,8 @@
                                          'help-args (list query))
                      (insert (string-remove-prefix title text)))
                    (insert "\n"))
-                 (insert ?\n))))
+                 (insert ?\n)))
+             (help-mode))
           duckduckgo-answer-buffer)
        (user-error "No response for the query")))))
 
