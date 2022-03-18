@@ -51,6 +51,8 @@
   'help-function 'duckduckgo-answer
   'help-echo (purecopy "mouse-2, RET: Browse the answer"))
 
+(defvar duckduckgo-answer-data nil)
+
 ;;;###autoload
 (defun duckduckgo-answer (query)
   (interactive "sInstant answer: ")
@@ -58,62 +60,65 @@
    query
    (lambda (response)
      (if response
-         (with-electric-help
-          `(lambda ()
-             (let ((answer (apply #'make-instance 'duckduckgo-answer-class ',response)))
-               (when-let (heading (oref answer Heading))
-                 (insert heading "\n")
-                 (insert ?\n))
+         (progn
+           (setq duckduckgo-answer-data
+                 (apply #'make-instance 'duckduckgo-answer-class response))
+           (with-electric-help
+            (lambda ()
+              (let ((answer duckduckgo-answer-data))
+                (when-let (heading (oref answer Heading))
+                  (insert heading "\n")
+                  (insert ?\n))
 
-               (when-let (abstract (oref answer Abstract))
-                 (insert "According to ")
-                 (insert-text-button (oref answer AbstractSource)
-                                     'type 'duckduckgo-external
-                                     'help-args (list (oref answer AbstractURL)))
-                 (insert ":\n" abstract "\n")
-                 (insert ?\n))
+                (when-let (abstract (oref answer Abstract))
+                  (insert "According to ")
+                  (insert-text-button (oref answer AbstractSource)
+                                      'type 'duckduckgo-external
+                                      'help-args (list (oref answer AbstractURL)))
+                  (insert ":\n" abstract "\n")
+                  (insert ?\n))
 
-               (when-let (infobox (oref answer Infobox))
-                 (dolist (content infobox)
-                   (insert (plist-get content :label) " :: ")
-                   (pcase (plist-get content :data_type)
-                     ("official_website"
-                      (insert-text-button (plist-get content :value)
-                                          'type 'duckduckgo-external
-                                          'help-args (list (plist-get content :value))))
-                     ("string"
-                      (insert (or (plist-get content :value) "")))
-                     (_
-                      (insert (format "%s" (plist-get content :value)))))
-                   (insert "\n"))
-                 (insert ?\n))
+                (when-let (infobox (oref answer Infobox))
+                  (dolist (content infobox)
+                    (insert (plist-get content :label) " :: ")
+                    (pcase (plist-get content :data_type)
+                      ("official_website"
+                       (insert-text-button (plist-get content :value)
+                                           'type 'duckduckgo-external
+                                           'help-args (list (plist-get content :value))))
+                      ("string"
+                       (insert (or (plist-get content :value) "")))
+                      (_
+                       (insert (format "%s" (plist-get content :value)))))
+                    (insert "\n"))
+                  (insert ?\n))
 
-               (when-let (results (oref answer Results))
-                 (dolist (result results)
-                   (insert-text-button (plist-get result :Text)
-                                       'type 'duckduckgo-external
-                                       'help-args (list (plist-get result :FirstURL)))
-                   (insert "\n"))
-                 (insert ?\n))
+                (when-let (results (oref answer Results))
+                  (dolist (result results)
+                    (insert-text-button (plist-get result :Text)
+                                        'type 'duckduckgo-external
+                                        'help-args (list (plist-get result :FirstURL)))
+                    (insert "\n"))
+                  (insert ?\n))
 
-               (when-let (topics (oref answer RelatedTopics))
-                 (insert "Also see: \n")
-                 (dolist (topic topics)
-                   (let* ((text (plist-get topic :Text))
-                          (url (plist-get topic :FirstURL))
-                          (query (cl-some `(lambda (prefix)
-                                             (when (string-prefix-p prefix ,url)
-                                               (string-remove-prefix prefix ,url)))
-                                          duckduckgo-answer-url-prefixes))
-                          (title (duckduckgo-answer--url-decode query)))
-                     (insert-text-button title
-                                         'type 'duckduckgo-answer-button
-                                         'help-args (list query))
-                     (insert (string-remove-prefix title text)))
-                   (insert "\n"))
-                 (insert ?\n)))
-             (help-mode))
-          duckduckgo-answer-buffer)
+                (when-let (topics (oref answer RelatedTopics))
+                  (insert "Also see: \n")
+                  (dolist (topic topics)
+                    (let* ((text (plist-get topic :Text))
+                           (url (plist-get topic :FirstURL))
+                           (query (cl-some `(lambda (prefix)
+                                              (when (string-prefix-p prefix ,url)
+                                                (string-remove-prefix prefix ,url)))
+                                           duckduckgo-answer-url-prefixes))
+                           (title (duckduckgo-answer--url-decode query)))
+                      (insert-text-button title
+                                          'type 'duckduckgo-answer-button
+                                          'help-args (list query))
+                      (insert (string-remove-prefix title text)))
+                    (insert "\n"))
+                  (insert ?\n)))
+              (help-mode))
+            duckduckgo-answer-buffer))
        (user-error "No response for the query")))))
 
 (defun duckduckgo-answer--url (query)
