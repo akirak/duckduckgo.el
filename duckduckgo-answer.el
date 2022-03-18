@@ -30,7 +30,7 @@
 (defun duckduckgo-answer-async (query callback)
   "Asynchronously retrieve an answer for QUERY and run CALLBACK."
   (if-let (response (duckduckgo-answer--get-cache query))
-      (if (equal (alist-get 'Type response) "D")
+      (if (equal (plist-get response :Type) "D")
           (duckduckgo-answer-async
            (duckduckgo-answer--disambiguate response)
            callback)
@@ -47,7 +47,7 @@
                        (_
                         (unwind-protect
                             (let ((response (duckduckgo-answer--process-resp query)))
-                              (if (equal (alist-get 'Type response) "D")
+                              (if (equal (plist-get response :Type) "D")
                                   (duckduckgo-answer-async
                                    (duckduckgo-answer--disambiguate response)
                                    callback)
@@ -64,7 +64,7 @@
                         (unwind-protect
                             (duckduckgo-answer--process-resp query)
                           (kill-buffer (current-buffer)))))))
-    (if (equal (alist-get 'Type response) "D")
+    (if (equal (plist-get response :Type) "D")
         (duckduckgo-answer-sync (duckduckgo-answer--disambiguate response))
       response)))
 
@@ -77,7 +77,7 @@
     result))
 
 (defun duckduckgo-answer--parse ()
-  (json-parse-buffer :object-type 'alist
+  (json-parse-buffer :object-type 'plist
                      :array-type 'list
                      :null-object nil
                      :false-object nil))
@@ -87,21 +87,21 @@
   (cl-labels
       ((make-candidate
          (group alist)
-         (if-let (url (alist-get 'FirstURL alist))
+         (if-let (url (plist-get alist :FirstURL))
              (propertize (string-remove-prefix "https://duckduckgo.com/" url)
                          'invisible t
-                         'help-echo (alist-get 'Text alist)
+                         'help-echo (plist-get alist :Text)
                          'duckduckgo-topic-group group)
-           (when-let (topics (alist-get 'Topics alist))
+           (when-let (topics (plist-get alist :Topics))
              (mapcar (apply-partially #'make-candidate
-                                      (append group (list (alist-get 'Name alist))))
+                                      (append group (list (plist-get alist :Name))))
                      topics)))))
     (let ((alternatives (thread-last
-                          (alist-get 'RelatedTopics response)
+                          (plist-get response :RelatedTopics)
                           (mapcar (apply-partially #'make-candidate nil))
                           (flatten-list))))
       (completing-read (format "Disambiguate \"%s\": "
-                               (alist-get 'Heading response))
+                               (plist-get response :Heading))
                        `(lambda (string pred action)
                           (if (eq action 'metadata)
                               '(metadata . ((category . duckduckgo-query)
