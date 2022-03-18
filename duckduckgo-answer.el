@@ -81,8 +81,10 @@
                       (insert-text-button (plist-get content :value)
                                           'type 'duckduckgo-external
                                           'help-args (list (plist-get content :value))))
+                     ("string"
+                      (insert (or (plist-get content :value) "")))
                      (_
-                      (insert (or (plist-get content :value) ""))))
+                      (insert (format "%s" (plist-get content :value)))))
                    (insert "\n"))
                  (insert ?\n))
 
