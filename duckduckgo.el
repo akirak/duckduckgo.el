@@ -191,7 +191,9 @@
       (prin1 duckduckgo-bang-alist (current-buffer)))
     (unless (file-directory-p (file-name-directory duckduckgo-bang-file))
       (make-directory (file-name-directory duckduckgo-bang-file)))
-    (write-file duckduckgo-bang-file)))
+    (setq buffer-file-name duckduckgo-bang-file)
+    (let ((inhibit-message t))
+      (save-buffer))))
 
 (defun duckduckgo-bang--restore ()
   (when (file-readable-p duckduckgo-bang-file)
