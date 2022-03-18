@@ -26,7 +26,9 @@
     (url-unhex-string query)
     (replace-regexp-in-string "_" " ")))
 
+;;;###autoload
 (defun duckduckgo-answer-async (query callback)
+  "Asynchronously retrieve an answer for QUERY and run CALLBACK."
   (if-let (response (duckduckgo-answer--get-cache query))
       (if (equal (alist-get 'Type response) "D")
           (duckduckgo-answer-async
@@ -53,7 +55,9 @@
                           (kill-buffer (current-buffer))))))
                    callback))))
 
+;;;###autoload
 (cl-defun duckduckgo-answer-sync (query)
+  "Synchronously retrieve an Instant Answer for QUERY."
   (let ((response (or (duckduckgo-answer--get-cache query)
                       (with-current-buffer (url-retrieve-synchronously
                                             (duckduckgo-answer--url query))
