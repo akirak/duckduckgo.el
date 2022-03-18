@@ -5,16 +5,110 @@
   :prefix "duckduckgo-answer-"
   :group 'duckduckgo)
 
+(defconst duckduckgo-answer-buffer "*DuckDuckGo Answer*")
+
+(defconst duckduckgo-answer-url-prefixes
+  '("https://duckduckgo.com/c/"
+    "https://duckduckgo.com/"))
+
 (defcustom duckduckgo-answer-directory
   (locate-user-emacs-file "duckduckgo/answers")
   "Directory in which Instant Answer responses are cached."
   :type 'directory)
 
+(defclass duckduckgo-answer ()
+  ((Abstract :initarg :Abstract)
+   (AbstractSource :initarg :AbstractSource)
+   (AbstractText :initarg :AbstractText)
+   (AbstractURL :initarg :AbstractURL)
+   (Answer :initarg :Answer)
+   (AnswerType :initarg :AnswerType)
+   (Definition :initarg :Definition)
+   (DefinitionSource :initarg :DefinitionSource)
+   (DefinitionURL :initarg :DefinitionURL)
+   (Entity :initarg :Entity)
+   (Heading :initarg :Heading)
+   (Image :initarg :Image)
+   (ImageHeight :initarg :ImageHeight)
+   (ImageIsLogo :initarg :ImageIsLogo)
+   (ImageWidth :initarg :ImageWidth)
+   (Infobox :initarg :Infobox)
+   (Redirect :initarg :Redirect)
+   (RelatedTopics :initarg :RelatedTopics)
+   (Results :initarg :Results)
+   (Type :initarg :Type)))
+
+(define-button-type 'duckduckgo-external
+  :supertype 'help-xref
+  'help-function 'browse-url
+  'help-echo (purecopy "mouse-2, RET: Browse the URL"))
+
+(define-button-type 'duckduckgo-answer
+  :supertype 'help-xref
+  'help-function 'duckduckgo-answer
+  'help-echo (purecopy "mouse-2, RET: Browse the answer"))
+
 ;;;###autoload
 (defun duckduckgo-answer (query)
   (interactive "sInstant answer: ")
+  (duckduckgo-answer-async
+   query
+   (lambda (response)
+     (if-let (plist (duckduckgo-answer--normalize-plist response))
+         (with-electric-help
+          `(lambda ()
+             (let ((answer (apply #'make-instance 'duckduckgo-answer ',plist)))
+               (when-let (heading (oref answer Heading))
+                 (insert heading "\n")
+                 (insert ?\n))
 
-  )
+               (when-let (abstract (oref answer Abstract))
+                 (insert "According to ")
+                 (insert-text-button (oref answer AbstractSource)
+                                     'type 'duckduckgo-external
+                                     'help-args (list (oref answer AbstractURL)))
+                 (insert ":\n" abstract "\n")
+                 (insert ?\n))
+
+               (when-let (infobox (oref answer Infobox))
+                 (dolist (content infobox)
+                   (insert (plist-get content :label) " :: ")
+                   (pcase (plist-get content :data_type)
+                     ("official_website"
+                      (insert-text-button (plist-get content :value)
+                                          'type 'duckduckgo-external
+                                          'help-args (list (plist-get content :value))))
+                     (_
+                      (insert (or (plist-get content :value) ""))))
+                   (insert "\n"))
+                 (insert ?\n))
+
+               (when-let (results (oref answer Results))
+                 (dolist (result results)
+                   (insert-text-button (plist-get result :Text)
+                                       'type 'duckduckgo-external
+                                       'help-args (list (plist-get result :FirstURL)))
+                   (insert "\n"))
+                 (insert ?\n))
+
+               (when-let (topics (oref answer RelatedTopics))
+                 (insert "Also see: \n")
+                 (dolist (topic topics)
+                   (let* ((text (plist-get topic :Text))
+                          (url (plist-get topic :FirstURL))
+                          (query (cl-some `(lambda (prefix)
+                                             (when (string-prefix-p prefix ,url)
+                                               (string-remove-prefix prefix ,url)))
+                                          duckduckgo-answer-url-prefixes))
+                          (title (duckduckgo-answer--url-decode query)))
+                     (insert-text-button title
+                                         'type 'duckduckgo-answer
+                                         'help-args (list query))
+                     (insert (string-remove-prefix title text)))
+                   (insert "\n"))
+                 (insert ?\n))))
+          duckduckgo-answer-buffer)
+       (user-error "No answer")))))
 
 (defun duckduckgo-answer--url (query)
   "Return an Instant Answer URL for a given query."
@@ -25,6 +119,38 @@
   (thread-last
     (url-unhex-string query)
     (replace-regexp-in-string "_" " ")))
+
+(defun duckduckgo-answer--normalize-plist (response)
+  (cl-labels
+      ((normalize-plist
+         (plist)
+         (cl-loop for (key value) on plist by #'cddr
+                  with result = nil
+                  with nonnil = nil
+                  with newvalue = nil
+                  do (setq newvalue
+                           (cond
+                            ((not value)
+                             nil)
+                            ((and (stringp value)
+                                  (string-empty-p value))
+                             nil)
+                            ((listp value)
+                             (cond
+                              ((eq key :Infobox)
+                               (plist-get value :content))
+                              ((keywordp (car value))
+                               (normalize-plist value))
+                              (t
+                               (mapcar #'normalize-plist value))))
+                            (t
+                             value)))
+                  unless (eq key :meta)
+                  append (list key newvalue) into result
+                  when (and newvalue (not (eq key :meta)))
+                  do (setq nonnil t)
+                  finally return (when nonnil result))))
+    (normalize-plist response)))
 
 ;;;###autoload
 (defun duckduckgo-answer-async (query callback)
