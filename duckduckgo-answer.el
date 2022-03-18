@@ -27,41 +27,50 @@
     (replace-regexp-in-string "_" " ")))
 
 (defun duckduckgo-answer-async (query callback)
-  (url-retrieve (duckduckgo-answer--url query)
-                (apply-partially
-                 (lambda (callback status &optional _cbargs)
-                   (pcase status
-                     (`(:error ,error . ,_)
-                      (error "Error while fetching an answer: %s"
-                             error))
-                     (`(:redirect ,url . ,_)
-                      (error "Redirection is unsupported (url %s)" url))
-                     (_
-                      (unwind-protect
-                          (let ((response (duckduckgo-answer--process-resp)))
-                            (if (equal (alist-get 'Type response) "D")
-                                (duckduckgo-answer-async
-                                 (duckduckgo-answer--disambiguate response)
-                                 callback)
-                              (funcall callback response)))
-                        (kill-buffer (current-buffer))))))
-                 callback)))
+  (if-let (response (duckduckgo-answer--get-cache query))
+      (if (equal (alist-get 'Type response) "D")
+          (duckduckgo-answer-async
+           (duckduckgo-answer--disambiguate response)
+           callback)
+        (funcall callback response))
+    (url-retrieve (duckduckgo-answer--url query)
+                  (apply-partially
+                   (lambda (callback status &optional _cbargs)
+                     (pcase status
+                       (`(:error ,error . ,_)
+                        (error "Error while fetching an answer: %s"
+                               error))
+                       (`(:redirect ,url . ,_)
+                        (error "Redirection is unsupported (url %s)" url))
+                       (_
+                        (unwind-protect
+                            (let ((response (duckduckgo-answer--process-resp query)))
+                              (if (equal (alist-get 'Type response) "D")
+                                  (duckduckgo-answer-async
+                                   (duckduckgo-answer--disambiguate response)
+                                   callback)
+                                (funcall callback response)))
+                          (kill-buffer (current-buffer))))))
+                   callback))))
 
 (cl-defun duckduckgo-answer-sync (query)
-  (let* ((buffer (url-retrieve-synchronously (duckduckgo-answer--url query)))
-         (response (unwind-protect
-                       (with-current-buffer buffer
-                         (duckduckgo-answer--process-resp))
-                     (kill-buffer buffer))))
+  (let ((response (or (duckduckgo-answer--get-cache query)
+                      (with-current-buffer (url-retrieve-synchronously
+                                            (duckduckgo-answer--url query))
+                        (unwind-protect
+                            (duckduckgo-answer--process-resp query)
+                          (kill-buffer (current-buffer)))))))
     (if (equal (alist-get 'Type response) "D")
         (duckduckgo-answer-sync (duckduckgo-answer--disambiguate response))
       response)))
 
-(defun duckduckgo-answer--process-resp ()
+(defun duckduckgo-answer--process-resp (query)
   (when-let (header-end (bound-and-true-p url-http-end-of-headers))
     (delete-region (point-min) header-end))
   (goto-char (point-min))
-  (duckduckgo-answer--parse))
+  (let ((result (duckduckgo-answer--parse)))
+    (duckduckgo-answer--save-cache query)
+    result))
 
 (defun duckduckgo-answer--parse ()
   (json-parse-buffer :object-type 'alist
@@ -111,6 +120,27 @@
                         " ")
               "")
             text)))
+
+;;;; Persistence
+
+(defun duckduckgo-answer--get-cache (query)
+  (let ((file (expand-file-name (concat query ".json")
+                                duckduckgo-answer-directory)))
+    (when (file-readable-p file)
+      (with-temp-buffer
+        (insert-file-contents file)
+        (goto-char (point-min))
+        (duckduckgo-answer--parse)))))
+
+(defun duckduckgo-answer--save-cache (query)
+  (let* ((file (expand-file-name (concat query ".json")
+                                 duckduckgo-answer-directory))
+         (dir (file-name-directory file)))
+    (unless (file-directory-p dir)
+      (make-directory dir t))
+    (setq buffer-file-name file)
+    (let ((inhibit-message t))
+      (save-buffer))))
 
 (provide 'duckduckgo-answer)
 ;;; duckduckgo-answer.el ends here
