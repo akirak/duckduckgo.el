@@ -99,7 +99,16 @@
 (defun duckduckgo-bang-update ()
   "Update the list of bangs."
   (interactive)
-  (url-retrieve duckduckgo-bang-url #'duckduckgo-bang--callback))
+  (url-retrieve duckduckgo-bang-url
+                (lambda (status &optional _cbargs)
+                  (pcase status
+                    (`(:error ,error . ,_)
+                     (error "Error while fetching bang_lite.html: %s" error))
+                    (`(:redirect ,url . ,_)
+                     (error "Redirection is unsupported (url %s)" url))
+                    (_
+                     (prog1 (duckduckgo-bang--parse)
+                       (kill-buffer (current-buffer))))))))
 
 (defun duckduckgo-bang--update-synchronously ()
   "Update the list of bangs."
@@ -109,16 +118,6 @@
         (with-current-buffer buffer
           (duckduckgo-bang--parse))
       (kill-buffer buffer))))
-
-(defun duckduckgo-bang--callback (status &optional _cbargs)
-  (pcase status
-    (`(:error ,error . ,_)
-     (error "Error while parsing bang_lite.html: %s" error))
-    (`(:redirect ,url . ,_)
-     (error "Redirect is unsupported (url %s)" url))
-    (_
-     (prog1 (duckduckgo-bang--parse)
-       (kill-buffer (current-buffer))))))
 
 (defun duckduckgo-bang--parse ()
   (goto-char (or (bound-and-true-p url-http-end-of-headers)
