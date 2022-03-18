@@ -1,6 +1,7 @@
 ;;; duckduckgo-answer.el --- Instant Answer -*- lexical-binding: t -*-
 
 (require 'eieio)
+(require 'seq)
 
 (defgroup duckduckgo-answer nil
   ""
@@ -126,32 +127,36 @@
   (cl-labels
       ((normalize-plist
          (plist)
-         (cl-loop for (key value) on plist by #'cddr
-                  with result = nil
-                  with nonnil = nil
-                  with newvalue = nil
-                  do (setq newvalue
-                           (cond
-                            ((not value)
-                             nil)
-                            ((and (stringp value)
-                                  (string-empty-p value))
-                             nil)
-                            ((listp value)
+         (thread-last
+           (seq-partition plist 2)
+           (mapcar (pcase-lambda (`(,key ,value))
+                     (unless (eq key :meta)
+                       (list key
                              (cond
-                              ((eq key :Infobox)
-                               (plist-get value :content))
-                              ((keywordp (car value))
-                               (normalize-plist value))
+                              ((not value)
+                               nil)
+                              ((and (stringp value)
+                                    (string-empty-p value))
+                               nil)
+                              ((listp value)
+                               (cond
+                                ((eq key :Infobox)
+                                 (plist-get value :content))
+                                ((keywordp (car value))
+                                 (normalize-plist value))
+                                (t
+                                 (mapcar #'normalize-plist value))))
                               (t
-                               (mapcar #'normalize-plist value))))
-                            (t
-                             value)))
-                  unless (eq key :meta)
-                  append (list key newvalue) into result
-                  when (and newvalue (not (eq key :meta)))
-                  do (setq nonnil t)
-                  finally return (when nonnil result))))
+                               value))))))
+           (delq nil)
+           (check-nullity)
+           (apply #'append)))
+       (check-nullity
+         (list)
+         (when (seq-some (pcase-lambda (`(,_ ,value))
+                           value)
+                         list)
+           list)))
     (normalize-plist response)))
 
 ;;;###autoload
