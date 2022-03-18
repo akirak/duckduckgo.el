@@ -54,10 +54,10 @@
   (duckduckgo-answer-async
    query
    (lambda (response)
-     (if-let (plist (duckduckgo-answer--normalize-plist response))
+     (if response
          (with-electric-help
           `(lambda ()
-             (let ((answer (apply #'make-instance 'duckduckgo-answer ',plist)))
+             (let ((answer (apply #'make-instance 'duckduckgo-answer ',response)))
                (when-let (heading (oref answer Heading))
                  (insert heading "\n")
                  (insert ?\n))
@@ -108,7 +108,7 @@
                    (insert "\n"))
                  (insert ?\n))))
           duckduckgo-answer-buffer)
-       (user-error "No answer")))))
+       (user-error "No response for the query")))))
 
 (defun duckduckgo-answer--url (query)
   "Return an Instant Answer URL for a given query."
@@ -172,7 +172,7 @@
                         (error "Redirection is unsupported (url %s)" url))
                        (_
                         (unwind-protect
-                            (let ((response (duckduckgo-answer--process-resp query)))
+                            (let ((response (duckduckgo-answer--process-resp)))
                               (if (equal (plist-get response :Type) "D")
                                   (duckduckgo-answer-async
                                    (duckduckgo-answer--disambiguate response)
@@ -184,23 +184,23 @@
 ;;;###autoload
 (cl-defun duckduckgo-answer-sync (query)
   "Synchronously retrieve an Instant Answer for QUERY."
-  (let ((response (or (duckduckgo-answer--get-cache query)
-                      (with-current-buffer (url-retrieve-synchronously
-                                            (duckduckgo-answer--url query))
-                        (unwind-protect
-                            (duckduckgo-answer--process-resp query)
-                          (kill-buffer (current-buffer)))))))
+  (when-let (response (or (duckduckgo-answer--get-cache query)
+                          (with-current-buffer (url-retrieve-synchronously
+                                                (duckduckgo-answer--url query))
+                            (unwind-protect
+                                (duckduckgo-answer--process-resp)
+                              (kill-buffer (current-buffer))))))
     (if (equal (plist-get response :Type) "D")
         (duckduckgo-answer-sync (duckduckgo-answer--disambiguate response))
       response)))
 
-(defun duckduckgo-answer--process-resp (query)
+(defun duckduckgo-answer--process-resp ()
   (when-let (header-end (bound-and-true-p url-http-end-of-headers))
     (delete-region (point-min) header-end))
   (goto-char (point-min))
-  (let ((result (duckduckgo-answer--parse)))
-    (duckduckgo-answer--save-cache query)
-    result))
+  (duckduckgo-answer--save-cache
+   (duckduckgo-answer--normalize-plist
+    (duckduckgo-answer--parse))))
 
 (defun duckduckgo-answer--parse ()
   (json-parse-buffer :object-type 'plist
@@ -262,15 +262,21 @@
         (goto-char (point-min))
         (duckduckgo-answer--parse)))))
 
-(defun duckduckgo-answer--save-cache (query)
-  (let* ((file (expand-file-name (concat query ".json")
-                                 duckduckgo-answer-directory))
-         (dir (file-name-directory file)))
-    (unless (file-directory-p dir)
-      (make-directory dir t))
-    (setq buffer-file-name file)
-    (let ((inhibit-message t))
-      (save-buffer))))
+(defun duckduckgo-answer--save-cache (plist)
+  (when plist
+    (let* ((query (thread-last
+                    (plist-get plist :Heading)
+                    (replace-regexp-in-string " " "_")
+                    (url-encode-url)))
+           (file (expand-file-name (concat query ".json")
+                                   duckduckgo-answer-directory))
+           (dir (file-name-directory file)))
+      (unless (file-directory-p dir)
+        (make-directory dir t))
+      (setq buffer-file-name file)
+      (let ((inhibit-message t))
+        (save-buffer)))
+    plist))
 
 (provide 'duckduckgo-answer)
 ;;; duckduckgo-answer.el ends here
