@@ -65,17 +65,22 @@
 (defun duckduckgo (query)
   "Search QUERY using DuckDuckGo."
   (interactive (list (completing-read
-                      "DuckDuckGo: "
-                      (duckduckgo-bang-completion
-                       (if (or duckduckgo-bang-alist
-                               (duckduckgo-bang--restore))
-                           (mapcar #'car duckduckgo-bang-alist)
-                         (duckduckgo-bang--update-synchronously)))
+                      "DuckDuckGo: " (duckduckgo-bang--completion)
                       nil nil nil duckduckgo-history)))
+  ;; TODO If the query is a bang, delegate call to `duckduckgo-bang--run'.
   (funcall duckduckgo-browse-url-function
            (concat duckduckgo-url "?q=" query)))
 
+(defun duckduckgo-bang--completion ()
+  "Return a completion table for bangs."
+  (duckduckgo-bang-completion
+   (if (or duckduckgo-bang-alist
+           (duckduckgo-bang--restore))
+       (mapcar #'car duckduckgo-bang-alist)
+     (duckduckgo-bang--update-synchronously))))
+
 (defun duckduckgo-bang-completion (candidates)
+  "Return a completion table for bangs from CANDIDATES."
   `(lambda (string pred action)
      (if (eq action 'metadata)
          '(metadata . ((category . duckduckgo-bang)
