@@ -98,6 +98,32 @@
              " " (propertize (string-join category " > ")
                              'face 'font-lock-comment-face)))))
 
+(defun duckduckgo-bang--run (bang query)
+  ;; TODO Allow using a different browser depending on the bang
+  (funcall duckduckgo-browse-url-function
+           (concat duckduckgo-url "?q=" bang " " query)))
+
+(cl-defun duckduckgo-bang-make-command (bang &key name description)
+  "Define an interactive function that calls a bang."
+  (interactive (cons (completing-read "Create a command for a bang: "
+                                      (duckduckgo-bang--completion)
+                                      nil t)
+                     (when current-prefix-arg
+                       (let ((name (read-string "Name of the command: ")))
+                         (unless (string-empty-p name)
+                           (list :name (intern name)))))))
+  (let ((sym (or name
+                 (intern (string-remove-prefix "!" bang))))
+        (body `(lambda (query)
+                 ,(or description
+                      (if-let (ent (assoc bang duckduckgo-bang-alist))
+                          (format "Run %s." (cadr ent))
+                        (format "Run %s." bang)))
+                 (interactive "sQuery: ")
+                 (duckduckgo-bang--run ,bang query))))
+    (fset sym body)
+    sym))
+
 ;;;; Parsing the list of bangs
 
 ;;;###autoload
