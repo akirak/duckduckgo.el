@@ -103,6 +103,7 @@
   (funcall duckduckgo-browse-url-function
            (concat duckduckgo-url "?q=" bang " " query)))
 
+;;;###autoload
 (cl-defun duckduckgo-bang-make-command (bang &key name description)
   "Define an interactive function that calls a bang."
   (interactive (cons (completing-read "Create a command for a bang: "
