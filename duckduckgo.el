@@ -37,6 +37,7 @@
 
 (declare-function utf7-decode "utf7")
 (declare-function xml-parse-tag "xml")
+(declare-function thing-at-point "thingatpt")
 
 (defgroup duckduckgo nil
   ""
@@ -60,6 +61,10 @@
 (defcustom duckduckgo-bang-define-commands t
   "Whether to define a command when a bang is called."
   :type 'boolean)
+
+(defcustom duckduckgo-default-thing 'word
+  "Default thing type in bang commands."
+  :type '(choice symbol (const nil)))
 
 (defvar duckduckgo-bang-alist nil)
 
@@ -119,6 +124,13 @@
   (funcall duckduckgo-browse-url-function
            (concat duckduckgo-url "?q=" bang " " query)))
 
+(defun duckduckgo-bang--default-query ()
+  (if (region-active-p)
+      (buffer-substring-no-properties (region-beginning)
+                                      (region-end))
+    (when duckduckgo-default-thing
+      (thing-at-point duckduckgo-default-thing t))))
+
 ;;;###autoload
 (cl-defun duckduckgo-bang-make-command (bang &key name description)
   "Define an interactive function that calls a bang."
@@ -136,7 +148,8 @@
                       (if-let (ent (assoc bang duckduckgo-bang-alist))
                           (format "Run %s." (cadr ent))
                         (format "Run %s." bang)))
-                 (interactive "sQuery: ")
+                 (interactive (list (read-string "Query: "
+                                                 (duckduckgo-bang--default-query))))
                  (duckduckgo-bang--run ,bang query))))
     (catch 'set
       (when (fboundp sym)
