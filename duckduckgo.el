@@ -57,6 +57,10 @@
   "File that stores the list of bangs."
   :type 'file)
 
+(defcustom duckduckgo-bang-define-commands t
+  "Whether to define a command when a bang is called."
+  :type 'boolean)
+
 (defvar duckduckgo-bang-alist nil)
 
 (defvar duckduckgo-history nil)
@@ -67,9 +71,21 @@
   (interactive (list (completing-read
                       "DuckDuckGo: " (duckduckgo-bang--completion)
                       nil nil nil duckduckgo-history)))
-  ;; TODO If the query is a bang, delegate call to `duckduckgo-bang--run'.
-  (funcall duckduckgo-browse-url-function
-           (concat duckduckgo-url "?q=" query)))
+  (pcase (duckduckgo-bang--p query)
+    (`nil (funcall duckduckgo-browse-url-function
+                   (concat duckduckgo-url "?q=" query)))
+    ;; TODO Allow using a different browser depending on the bang
+    (bang
+     (when duckduckgo-bang-define-commands
+       (duckduckgo-bang-make-command bang))
+     (funcall duckduckgo-browse-url-function
+              (concat duckduckgo-url "?q=" query)))))
+
+(defun duckduckgo-bang--p (query)
+  "Return the bang of QUERY."
+  (save-match-data
+    (when (string-match (rx symbol-start "!" (+ alnum)) query)
+      (match-string 0 query))))
 
 (defun duckduckgo-bang--completion ()
   "Return a completion table for bangs."

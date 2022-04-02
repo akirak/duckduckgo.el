@@ -17,4 +17,20 @@
               :to-contain
               '("!wolf" . "Wolfram Alpha")))))
 
+(describe "Parsing query possibly containing a bang"
+  (it "returns nil if no bang is contained"
+    (expect (duckduckgo--bang-query-p "hello bang")
+            :to-be nil)
+    (expect (duckduckgo--bang-query-p "hello bang!")
+            :to-be nil))
+  (it "returns the name of a bang if it contains a bang"
+    (expect (duckduckgo--bang-query-p "!hackage")
+            :to-equal "!hackage")
+    (expect (duckduckgo--bang-query-p "!hackage hoogle")
+            :to-equal "!hackage")
+    (expect (duckduckgo--bang-query-p "hoogle !hackage")
+            :to-equal "!hackage")
+    (expect (duckduckgo--bang-query-p "hoogle !hackage haskellwiki")
+            :to-equal "!hackage")))
+
 (provide 'duckduckgo-test)
