@@ -172,9 +172,12 @@
   "Asynchronously retrieve an answer for QUERY and run CALLBACK."
   (if-let (response (duckduckgo-answer--get-cache query))
       (if (equal (plist-get response :Type) "D")
-          (duckduckgo-answer-async
-           (duckduckgo-answer--disambiguate response)
-           callback)
+          (if-let (new-query (duckduckgo-answer--disambiguate response))
+              (duckduckgo-answer-async
+               new-query
+               callback)
+            ;; If the same input is chosen twice, stop disambiguation.
+            (funcall callback response))
         (funcall callback response))
     (url-retrieve (duckduckgo-answer--url query)
                   (apply-partially
@@ -189,9 +192,12 @@
                         (unwind-protect
                             (let ((response (duckduckgo-answer--process-resp)))
                               (if (equal (plist-get response :Type) "D")
-                                  (duckduckgo-answer-async
-                                   (duckduckgo-answer--disambiguate response)
-                                   callback)
+                                  (if-let (new-query (duckduckgo-answer--disambiguate response))
+                                      (duckduckgo-answer-async
+                                       new-query
+                                       callback)
+                                    ;; If the same input is chosen twice, stop disambiguation.
+                                    (funcall callback response))
                                 (funcall callback response)))
                           (kill-buffer (current-buffer))))))
                    callback))))
@@ -206,7 +212,10 @@
                                 (duckduckgo-answer--process-resp)
                               (kill-buffer (current-buffer))))))
     (if (equal (plist-get response :Type) "D")
-        (duckduckgo-answer-sync (duckduckgo-answer--disambiguate response))
+        (if-let (new-query (duckduckgo-answer--disambiguate response))
+            (duckduckgo-answer-sync new-query)
+          ;; If the same input is chosen twice, stop disambiguation.
+          response)
       response)))
 
 (defun duckduckgo-answer--process-resp ()
@@ -240,18 +249,23 @@
              (mapcar (apply-partially #'make-candidate
                                       (append group (list (plist-get alist :Name))))
                      topics)))))
-    (let ((alternatives (thread-last
-                          (plist-get response :RelatedTopics)
-                          (mapcar (apply-partially #'make-candidate nil))
-                          (flatten-list))))
-      (completing-read (format "Disambiguate \"%s\": "
-                               (plist-get response :Heading))
-                       `(lambda (string pred action)
-                          (if (eq action 'metadata)
-                              '(metadata . ((category . duckduckgo-query)
-                                            (annotation-function
-                                             . duckduckgo-answer--annotate-topic)))
-                            (complete-with-action action ',alternatives string pred)))))))
+    (let* ((alternatives (thread-last
+                           (plist-get response :RelatedTopics)
+                           (mapcar (apply-partially #'make-candidate nil))
+                           (flatten-list)))
+           (choice (completing-read
+                    (format "Disambiguate \"%s\": "
+                            (plist-get response :Heading))
+                    `(lambda (string pred action)
+                       (if (eq action 'metadata)
+                           '(metadata . ((category . duckduckgo-query)
+                                         (annotation-function
+                                          . duckduckgo-answer--annotate-topic)))
+                         (complete-with-action action ',alternatives string pred))))))
+      ;; When the same input is chosen twice, return nil.
+      (unless (equal (duckduckgo-answer--url-decode choice)
+                     (plist-get response :Heading))
+        choice))))
 
 (defun duckduckgo-answer--annotate-topic (candidate)
   (let ((text (get-char-property 0 'help-echo candidate))
