@@ -122,8 +122,16 @@
                         (format "Run %s." bang)))
                  (interactive "sQuery: ")
                  (duckduckgo-bang--run ,bang query))))
-    (fset sym body)
-    sym))
+    (catch 'set
+      (when (fboundp sym)
+        (if (called-interactively-p t)
+            (setq sym (intern (read-string
+                               (format "Function \"%s\" is already bound. Enter a new name: "
+                                       sym))))
+          (message "Function \"%s\" is already bound" sym)
+          (throw 'set nil)))
+      (fset sym body)
+      sym)))
 
 ;;;; Parsing the list of bangs
 
