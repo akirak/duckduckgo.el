@@ -37,6 +37,7 @@
 
 (declare-function utf7-decode "utf7")
 (declare-function xml-parse-tag "xml")
+(declare-function thing-at-point "thingatpt")
 
 (defgroup duckduckgo nil
   ""
@@ -57,6 +58,14 @@
   "File that stores the list of bangs."
   :type 'file)
 
+(defcustom duckduckgo-bang-define-commands t
+  "Whether to define a command when a bang is called."
+  :type 'boolean)
+
+(defcustom duckduckgo-default-thing 'word
+  "Default thing type in bang commands."
+  :type '(choice symbol (const nil)))
+
 (defvar duckduckgo-bang-alist nil)
 
 (defvar duckduckgo-history nil)
@@ -67,9 +76,21 @@
   (interactive (list (completing-read
                       "DuckDuckGo: " (duckduckgo-bang--completion)
                       nil nil nil duckduckgo-history)))
-  ;; TODO If the query is a bang, delegate call to `duckduckgo-bang--run'.
-  (funcall duckduckgo-browse-url-function
-           (concat duckduckgo-url "?q=" query)))
+  (pcase (duckduckgo-bang--p query)
+    (`nil (funcall duckduckgo-browse-url-function
+                   (concat duckduckgo-url "?q=" query)))
+    ;; TODO Allow using a different browser depending on the bang
+    (bang
+     (when duckduckgo-bang-define-commands
+       (duckduckgo-bang-make-command bang))
+     (funcall duckduckgo-browse-url-function
+              (concat duckduckgo-url "?q=" query)))))
+
+(defun duckduckgo-bang--p (query)
+  "Return the bang of QUERY."
+  (save-match-data
+    (when (string-match (rx symbol-start "!" (+ alnum)) query)
+      (match-string 0 query))))
 
 (defun duckduckgo-bang--completion ()
   "Return a completion table for bangs."
@@ -103,6 +124,13 @@
   (funcall duckduckgo-browse-url-function
            (concat duckduckgo-url "?q=" bang " " query)))
 
+(defun duckduckgo-bang--default-query ()
+  (if (region-active-p)
+      (buffer-substring-no-properties (region-beginning)
+                                      (region-end))
+    (when duckduckgo-default-thing
+      (thing-at-point duckduckgo-default-thing t))))
+
 ;;;###autoload
 (cl-defun duckduckgo-bang-make-command (bang &key name description)
   "Define an interactive function that calls a bang."
@@ -120,10 +148,19 @@
                       (if-let (ent (assoc bang duckduckgo-bang-alist))
                           (format "Run %s." (cadr ent))
                         (format "Run %s." bang)))
-                 (interactive "sQuery: ")
+                 (interactive (list (read-string "Query: "
+                                                 (duckduckgo-bang--default-query))))
                  (duckduckgo-bang--run ,bang query))))
-    (fset sym body)
-    sym))
+    (catch 'set
+      (when (fboundp sym)
+        (if (called-interactively-p t)
+            (setq sym (intern (read-string
+                               (format "Function \"%s\" is already bound. Enter a new name: "
+                                       sym))))
+          (message "Function \"%s\" is already bound" sym)
+          (throw 'set nil)))
+      (fset sym body)
+      sym)))
 
 ;;;; Parsing the list of bangs
 
