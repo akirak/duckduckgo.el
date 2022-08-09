@@ -73,9 +73,19 @@
 ;;;###autoload
 (defun duckduckgo (query)
   "Search QUERY using DuckDuckGo."
-  (interactive (list (completing-read
-                      "DuckDuckGo: " (duckduckgo-bang--completion)
-                      nil nil nil duckduckgo-history)))
+  (interactive (list (let ((text (when (use-region-p)
+                                   (buffer-substring-no-properties
+                                    (region-beginning)
+                                    (region-end)))))
+                       (concat (completing-read
+                                (if text
+                                    (format "DuckDuckGo (with \"%s\"): " text)
+                                  "DuckDuckGo: ")
+                                (duckduckgo-bang--completion)
+                                nil nil nil duckduckgo-history)
+                               (if text
+                                   (concat " " text)
+                                 "")))))
   (pcase (duckduckgo-bang--p query)
     (`nil (funcall duckduckgo-browse-url-function
                    (concat duckduckgo-url "?q=" query)))
